@@ -24,6 +24,8 @@ module Jabber
           Plain.new(stream)
         when 'ANONYMOUS'
           Anonymous.new(stream)
+        when 'OAUTH2'
+          XOAuth2.new(stream)
         else
           raise "Unknown SASL mechanism: #{mechanism}"
       end
@@ -48,6 +50,21 @@ module Jabber
 
       def generate_nonce
         Digest::MD5.hexdigest(Time.new.to_f.to_s)
+      end
+    end
+
+    class XOAuth2 < Base
+      def auth(password)
+        auth_text = "\x00#{@stream.jid.strip}\x00#{password}"
+        error = nil
+        @stream.send(generate_auth('X-OAUTH2', Base64::encode64(auth_text).gsub(/\s/, ''))) { |reply|
+          if reply.name != 'success'
+            error = reply.first_element(nil).name
+          end
+          true
+        }
+
+        raise error if error
       end
     end
 
